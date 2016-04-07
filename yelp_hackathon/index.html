@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Niubi Site</title>
+  <meta name="viewport" content="initial-scale=1.0">
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      height: 100%;
+    }
+    #floating-panel {
+      position: absolute;
+      top: 10px;
+      left: 25%;
+      z-index: 5;
+      text-align: center;
+      font-family: 'Roboto','sans-serif';
+      line-height: 30px;
+    }
+    #floating-panel {
+      left: 25%;
+      padding: 5px;
+      position: absolute;
+      top: 10px;
+      z-index: 5;
+    }
+  </style>
+  <link href="Flat-UI-2.2.2/dist/css/flat-ui.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-1.12.0.min.js"></script>
+  <script src="https://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+</head>
+<body>
+
+ <div id="floating-panel">
+  <button class="btn btn-embossed btn-primary" onclick="toggleHeatmap()">
+    Toggle Heatmap
+  </button>
+  <button class="btn btn-embossed btn-primary" onclick="toggleLinkMap()">
+    Toggle Link Map
+  </button>
+  <button class="btn btn-embossed btn-primary" onclick="toggleInfluencerMap()">
+    Toggle Influencer Map
+  </button>
+</div>
+<div id="map"></div>
+<script>
+
+  var map, heatmap, linkMap;
+  var mapJSON;
+
+  var heapmapSource = "heatmap_biz.json";
+  var linkMapSource = "link_map_final_100.json";
+  var influencerSource = "circlemap.json";
+  
+  var heatmapEnabled = false;
+  var linkMapEnabled = false;
+  var influencerMapEnabled = false;
+  /******************************************** INIT MAP ********************************************/
+
+  var myStyle = [
+  {
+    featureType: "all",
+    stylers: [
+    { saturation: -60 },
+    { hue: "#00d4ff" }
+    ]
+  },{
+    featureType: "road.arterial",
+    elementType: "all",
+    stylers: [
+    { visibility: "off" }
+    ]
+  },{
+    featureType: "road.highway",
+    elementType: "all",
+    stylers: [
+    { visibility: "off" }
+    ]
+  },{
+   featureType: "landscape",
+   elementType: "all",
+   stylers: [
+   { visibility: "off" }
+   ]
+ },{
+   featureType: "poi",
+   elementType: "labels",
+   stylers: [
+   { visibility: "off" }
+   ]
+ },{
+   featureType: "transit",
+   elementType: "all",
+   stylers: [
+   { visibility: "off" }
+   ]
+ },{
+   featureType: "water",
+   elementType: "labels",
+   stylers: [
+   { visibility: "off" }
+   ]
+ },{
+   featureType: "administrative.neighborhood",
+   elementType: "labels",
+   stylers: [
+   { visibility: "off" }
+   ]
+ }
+ ];
+
+ function initMap() {
+  map = new google.maps.Map(document.getElementById('map'), {
+    mapTypeControlOptions: {
+      mapTypeIds: ['mystyle', google.maps.MapTypeId.ROADMAP, google.maps.MapTypeId.TERRAIN]
+    },
+    zoom: 11,
+    styles: myStyle,
+    center: {lat: 45.563, lng: -73.65}
+  });
+
+    // Load dataset from ville montreal
+    map.data.loadGeoJson("quartierssociologiques2014.json");
+    map.data.setStyle({
+      fillColor: '#9E9E9E',
+      strokeWeight: 0.5
+    });
+  }
+
+
+  /******************************************** HEATMAP ********************************************/
+  function toggleHeatmap() {
+    if (heatmapEnabled) {
+      heatmap.setMap(heatmap.getMap() ? null : map);
+    } else {
+      drawHeatmap();
+      heatmapEnabled = true;
+    }
+  }
+
+  function drawHeatmap() {
+
+    var dataLists;
+    var locations = [];
+
+    var test_data = $.getJSON(heapmapSource)
+    .always(function(json) {
+      dataLists = json["data"]
+
+      for (i = 0; i < dataLists.length; i++) { 
+        var lat = dataLists[i]["lat"];
+        var log = dataLists[i]["long"];
+        var weight = dataLists[i]["weight"];
+        var location = {location: new google.maps.LatLng(lat, log), weight: weight};
+        locations.push(location);
+      };
+
+      heatmap = new google.maps.visualization.HeatmapLayer({
+        data: locations,
+        map: map
+      });
+      
+      // Set the color gradient of the heatmap
+      var gradient = [
+      'rgba(0, 255, 255, 0)',
+      'rgba(0, 200, 255, 1)',
+      'rgba(0, 157, 255, 1)',
+      'rgba(0, 97, 255, 1)',
+      'rgba(0, 50, 255, 1)',
+      'rgba(0, 0, 255, 1)',
+      'rgba(0, 0, 223, 1)',
+      'rgba(0, 0, 191, 1)',
+      'rgba(0, 0, 159, 1)',
+      'rgba(0, 0, 127, 1)',
+      'rgba(63, 0, 91, 1)',
+      'rgba(127, 0, 63, 1)',
+      'rgba(190, 0, 31, 1)',
+      'rgba(240, 0, 0, 1)'
+      ]
+      heatmap.set('gradient', heatmap.get('gradient') ? null : gradient);
+
+    });
+  }
+
+
+  /******************************************** LINK MAP ********************************************/
+  var linkMap = [];
+  
+  function toggleLinkMap() {
+    if (linkMapEnabled) {
+      for (var i = 0; i < linkMap.length; i++) {
+        linkMap[i].setMap(linkMap[i].getMap() ? null : map);
+      }
+    } else {
+      drawLinkMap();
+      linkMapEnabled = true;
+    }
+  }
+  
+  function drawLinkMap() {
+    var test_data = $.getJSON(linkMapSource)
+    .always(function(json) {
+      var clusters = json["main"];
+
+      for (var i = 0; i < clusters.length; i++) {
+        var clusterData = clusters[i]["data"];
+
+        for (var j = 0; j < clusterData.length; j++) {
+          var linkPath = new google.maps.Polyline({
+            path: clusterData[j],
+            geodesic: true,
+            strokeColor: '#3949AB',
+            strokeOpacity: 1.0,
+            strokeWeight: 0.5
+          });
+          linkPath.setMap(map);
+          linkMap.push(linkPath);
+        }
+      }
+
+      showPoints();
+    });
+  }
+
+  function showPoints() {
+    var test_data = $.getJSON("points.json")
+    .always(function(json) {
+      var pointsArray = json["data"]
+      var markerImg = "user_name.png"
+
+      for (var j = 0; j < pointsArray.length; j++) {
+        var beachMarker = new google.maps.Marker({
+          position: pointsArray[j],
+          map: map,
+          icon: markerImg
+        });
+        linkMap.push(beachMarker);
+      }
+    });
+  }
+
+  /******************************************** INFLUENCER MAP ********************************************/
+  var influencerMap = [];
+
+  function toggleInfluencerMap() {
+    if (influencerMapEnabled) {
+      for (var i = 0; i < influencerMap.length; i++) {
+        influencerMap[i].setMap(influencerMap[i].getMap() ? null : map);
+      }
+    } else {
+      drawInfluencerMap();
+      influencerMapEnabled = true;
+    }
+  }
+
+  function drawInfluencerMap() {
+    var test_data = $.getJSON(influencerSource)
+    .always(function(json) {
+      var influencers = json["data"];
+
+      for (var i = 0; i < influencers.length; i++) {
+        // Add the circle for this city to the map.
+        var influencerCircle = new google.maps.Circle({
+          strokeColor: '#FF0000',
+          strokeOpacity: 0.6,
+          strokeWeight: 1,
+          fillColor: '#FF0000',
+          fillOpacity: 0.3,
+          map: map,
+          center: influencers[i]["center"],
+          radius: Math.sqrt(influencers[i]["weight"]) * 100
+        });
+
+        influencerMap.push(influencerCircle);
+      }
+    });
+
+  }
+
+
+
+
+</script>
+<script async defer
+src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCCCaY6zvruXdOhV2FTxrGEHJD-E7bH734&libraries=visualization&callback=initMap">
+</script>
+
+</body>
+</html>
